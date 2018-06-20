@@ -267,9 +267,163 @@ exit 0
 # chmod +x /etc/rc.d/rc.local
 ```
 
+---
+keepalived + redis
 
+* 安装
 
+```
+# yum -y install keepalived redis
+```
 
+* 配置
 
+```
+keepalived master/backup
 
+vrrp_script chk_redis {
+
+script "/etc/keepalived/scripts/redis_check.py" ###监控脚本
+
+interval 1 ###监控时间设置为1s
+
+}
+
+vrrp_instance VI_1 {
+
+state MASTER ###设置为MASTER
+
+interface eno16780032 ###监控网卡
+
+virtual_router_id 70
+
+priority 101 ###权重值
+
+authentication {
+
+auth_type PASS ###加密
+
+auth_pass redis ###密码
+
+}
+
+track_script {
+
+chk_redis ###调用上面定义的chk_redis
+
+}
+
+virtual_ipaddress {
+
+192.168.91.112 ###对外的虚拟IP
+
+}
+
+notify_master /etc/keepalived/scripts/redis_master.py
+
+notify_backup /etc/keepalived/scripts/redis_backup.py
+
+notify_fault /etc/keepalived/scripts/redis_fault.py
+
+notify_stop /etc/keepalived/scripts/redis_stop.py
+
+}
+
+master/backup区别
+1. state MASTER/BACKUP
+2. interface
+3. priority
+
+```
+
+```
+redis master/slave
+
+注意
+master/slave 
+1. bind 0.0.0.0
+
+slave
+1. save "" 去掉注释
+2. 其他save项注释掉
+3. slaveof masterip masterport
+4. appendonly yes
+
+```
+
+* 脚本
+
+```
+redis_check.py 
+
+#!/usr/bin/python
+
+import os
+import sys
+import time
+
+PING = 'redis-cli ping' #redis ping command, observe network state
+os.chdir("/var/log/redis/") #set log file path
+fp = open("redis_dump.log",'a') #open log file with append mode
+result = os.system(PING) #exec command
+if 0 == result: #network state ok
+    logtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+    fp.write("[check]" + logtime + ":" + 'redis running!\n')
+    fp.close()
+    sys.exit(0)
+else:
+    logtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+    fp.write("[check]" + logtime + ":" + 'redis stop service!\n')
+    fp.close()
+    sys.exit(1)
+```
+
+```
+redis_master.py
+
+#!/usr/bin/python
+
+import os
+import time
+
+SLAVEOF = 'redis-cli slaveof 192.168.91.42 6379' #backup data form slave
+SLAVENO = 'redis-cli slaveof no one' #being master
+os.chdir("/var/log/redis/") #set log file path
+fp = open("redis_dump.log",'a') #open log file with append mode
+result = os.system(SLAVEOF) #exec command
+logtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime()) #get time info
+if 0 == result: #backup data from slave
+    fp.write("[master]" + logtime + ":" + 'start copy data from slave!\n')
+else:
+    fp.write("[master]" + logtime + ":" + 'copy data from slave falue!\n')
+time.sleep(10) #set backup time
+result = os.system(SLAVENO) #being master
+logtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+if 0 == result:
+    fp.write("[master]" + logtime + ":" + 'stop copy data, being master!\n')
+else:
+    fp.write("[master]" + logtime + ":" + 'being master falue!\n')
+fp.close()
+```
+
+```
+redis_backup.py
+
+#!/usr/bin/python
+
+import os
+import time
+
+time.sleep(15) #set data backup time
+SLAVEOF = 'redis-cli slaveof 192.168.91.42 6379'
+os.chdir("/var/log/redis/") #set log file path
+fp = open("redis_dump.log",'a') #open log file with append mode
+result = os.system(SLAVEOF) #exec command
+logtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+if 0 == result:
+    fp.write("[backup]" + logtime + ":" + 'being slave!\n')
+else:
+    fp.write("[backup]" + logtime + ":" + 'being slave falue!\n')
+fp.close()
+```
 
