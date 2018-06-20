@@ -427,3 +427,41 @@ else:
 fp.close()
 ```
 
+* 启动
+
+```
+systemctl start redis
+systemctl start keepalived
+
+```
+
+* 测试
+
+```
+ip a
+redis-cli info
+redis-cli
+
+1. redis master 写入
+ > set name xxx
+
+2. redis slave 查看
+ > keys *
+
+4. tailf /var/log/redis_dump.log
+
+3. redis master stop
+ # systemctl stop redis
+
+4. ip a
+
+5. slave 变 master
+ # redis-cli info
+
+6. 新 master 测试写入
+
+7. 旧 master 重启
+
+8. 检查 master/slave 切换，以及数据同步情况
+
+```
