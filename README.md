@@ -414,7 +414,7 @@ redis_backup.py
 import os
 import time
 
-time.sleep(15) #set data backup time
+# time.sleep(15) #set data backup time
 SLAVEOF = 'redis-cli slaveof 192.168.91.42 6379'
 os.chdir("/var/log/redis/") #set log file path
 fp = open("redis_dump.log",'a') #open log file with append mode
